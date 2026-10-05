@@ -48,3 +48,6 @@ CONFIG_LV_FONT_MONTSERRAT_12=y
 # Sans SC (about 1 MB), which reads better on this screen than Unifont.
 CONFIG_MUSE_CJK_FONT=y
 CONFIG_MUSE_CJK_FONT_NOTO=y
+# Flashed over USB only. An image pushed over the air is built for no
+# particular board and would leave this screen dark.
+CONFIG_HOMEHUB_OTA_ENABLED=n
