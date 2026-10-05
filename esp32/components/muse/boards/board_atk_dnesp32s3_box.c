@@ -37,6 +37,7 @@
 #include "esp_lv_adapter.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 #include "muse_audio.h"
@@ -78,6 +79,7 @@ static esp_lcd_panel_handle_t s_panel;
 static esp_codec_dev_handle_t s_spk, s_mic;
 static muse_gpio_button_t s_talk;
 static uint8_t s_xl_out;           /* last value written to OUT0 */
+static SemaphoreHandle_t s_xl_lock; /* the UI and audio tasks both write OUT0 */
 static bool s_k1_pressed;
 static uint8_t s_k1_stable;
 
@@ -94,10 +96,14 @@ static esp_err_t xl_read(uint8_t reg, uint8_t *val)
 
 static esp_err_t xl_set(uint8_t mask, bool on)
 {
+    xSemaphoreTake(s_xl_lock, portMAX_DELAY);
     uint8_t out = on ? (s_xl_out | mask) : (s_xl_out & ~mask);
-    ESP_RETURN_ON_ERROR(xl_write(XL9555_OUT0, out), TAG, "xl9555 out");
-    s_xl_out = out;
-    return ESP_OK;
+    esp_err_t err = xl_write(XL9555_OUT0, out);
+    if (err == ESP_OK) {
+        s_xl_out = out;
+    }
+    xSemaphoreGive(s_xl_lock);
+    return err;
 }
 
 static esp_err_t init(void)
@@ -118,6 +124,8 @@ static esp_err_t init(void)
         .scl_speed_hz = 400000,
     };
     ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(s_i2c, &xl_cfg, &s_xl), TAG, "xl9555");
+    s_xl_lock = xSemaphoreCreateMutex();
+    ESP_RETURN_ON_FALSE(s_xl_lock, ESP_ERR_NO_MEM, TAG, "xl9555 lock");
     /* Backlight and amplifier off until the display and audio start. */
     ESP_RETURN_ON_ERROR(xl_read(XL9555_OUT0, &s_xl_out), TAG, "xl9555 read");
     ESP_RETURN_ON_ERROR(xl_set(XL_BL | XL_SPK_EN, false), TAG, "xl9555 outputs");

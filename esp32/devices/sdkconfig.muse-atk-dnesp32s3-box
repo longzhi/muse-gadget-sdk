@@ -44,3 +44,5 @@ CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=8
 # Two-key menu.
 CONFIG_LV_FONT_MONTSERRAT_12=y
+# Muse often answers in Chinese: captions fall back to Unifont's CJK (850 KB).
+CONFIG_MUSE_CJK_FONT=y
