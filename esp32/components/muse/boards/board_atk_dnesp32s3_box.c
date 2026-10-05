@@ -37,7 +37,7 @@
 #include "esp_log.h"
 #include "esp_lv_adapter.h"
 #include "esp_ota_ops.h"
-#include "esp_system.h"
+#include "esp_rom_sys.h"
 #include "esp_timer.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
@@ -333,7 +333,9 @@ static void switch_to_vibe_buddy(void)
     ESP_LOGI(TAG, "switching to %s", other->label);
     muse_state_set_caption("SWITCHING TO VIBE BUDDY");
     vTaskDelay(pdMS_TO_TICKS(500));
-    esp_restart();
+    /* A system reset, not esp_restart()'s CPU reset: that leaves the flash
+     * controller as Muse tuned it, and Vibe Buddy's flash writes then fail. */
+    esp_rom_software_reset_system();
 }
 #endif
 
