@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Build or flash Home Link for one board:
-#   tools/muse/board.sh build|flash <s3|s3n|aipi|box3|c6|watcher|sticks3|plus2|cardputer-adv|stopwatch|cores3|core2|fnk0104b|jc3248w535> [serial|port]
+#   tools/muse/board.sh build|flash <s3|s3n|aipi|box3|atk-box|c6|watcher|sticks3|plus2|cardputer-adv|stopwatch|cores3|core2|fnk0104b|jc3248w535> [serial|port]
 # Build log: /tmp/muse_build_<board>.log. flash finds the board's port by its
 # USB device (tools/muse/ports.py); with several of a kind attached, pass the
 # one's USB serial number (the MAC on native USB) or its port. Flashing from a
@@ -30,6 +30,7 @@ case $board in
     s3n)     profile=waveshare-s3-175;     target=esp32s3 ;;
     aipi)    profile=aipi;                 target=esp32s3 ;;
     box3)    profile=espressif-box-3;       target=esp32s3 ;;
+    atk-box) profile=atk-dnesp32s3-box;     target=esp32s3 ;;
     c6)      profile=waveshare-c6-18;      target=esp32c6 ;;
     # Its CH342 bridge drops bytes when esptool sends a whole packet at once,
     # so pace the writes (paced_esptool.py) at the baud they were tested at.
