@@ -147,6 +147,14 @@ menu "Muse"
             Without it those characters show as boxes. Hangul isn't
             included.
 
+    config MUSE_ATK_BOX_DUAL_BOOT
+        bool "ATK-DNESP32S3-BOX: share the box with Vibe Buddy"
+        depends on MUSE_BOARD_ATK_DNESP32S3_BOX
+        default n
+        help
+            Holding K1 and K2 for 3 s boots the other app slot, where Vibe
+            Buddy lives (partitions_atk_box_dual.csv).
+
     config MUSE_CJK_FONT_NOTO
         bool "Draw CJK captions with Noto Sans SC instead of Unifont"
         depends on MUSE_CJK_FONT

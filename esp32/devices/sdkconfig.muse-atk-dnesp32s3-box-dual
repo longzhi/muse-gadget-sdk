@@ -1,0 +1,26 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The ATK-DNESP32S3-BOX shared with Vibe Buddy (partitions_atk_box_dual.csv).
+# Load last, after sdkconfig.muse-atk-dnesp32s3-box.
+CONFIG_MUSE_ATK_BOX_DUAL_BOOT=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_atk_box_dual.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+# Each app switches to the other through otadata, and neither confirms itself
+# after the switch: with rollback on, the bootloader would send it back.
+# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
+# With OTA off, signing only stops Muse switching to Vibe Buddy, whose image
+# isn't signed with this key.
+# CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT is not set
+# CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES is not set

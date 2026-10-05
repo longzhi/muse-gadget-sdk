@@ -21,7 +21,8 @@
  * which also switches the backlight and the speaker amplifier. Pins follow
  * xiaozhi-esp32's alientek/atk-dnesp32s3-box board; the LCD, ES8311 output
  * and the three keys were checked on a unit by Vibe Buddy.
- * K0 is talk, K1 steps the menu; K2 is unused.
+ * K0 is talk, K1 steps the menu. With CONFIG_MUSE_ATK_BOX_DUAL_BOOT, holding
+ * K1 and K2 for 3 s boots the other app slot, Vibe Buddy's.
  */
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
@@ -35,6 +36,9 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_log.h"
 #include "esp_lv_adapter.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -43,6 +47,7 @@
 #include "muse_audio.h"
 #include "muse_board.h"
 #include "muse_mem.h"
+#include "muse_state.h"
 
 static const char *TAG = "board";
 
@@ -80,8 +85,17 @@ static esp_codec_dev_handle_t s_spk, s_mic;
 static muse_gpio_button_t s_talk;
 static uint8_t s_xl_out;           /* last value written to OUT0 */
 static SemaphoreHandle_t s_xl_lock; /* the UI and audio tasks both write OUT0 */
-static bool s_k1_pressed;
-static uint8_t s_k1_stable;
+#define SWITCH_HOLD_US (3 * 1000 * 1000)
+
+/* An expander key, debounced like muse_gpio_button_poll(). */
+typedef struct {
+    uint8_t mask;
+    bool pressed;
+    uint8_t stable;
+} xl_key_t;
+
+static xl_key_t s_k1 = { .mask = XL_K1 }, s_k2 = { .mask = XL_K2 };
+static int64_t s_both_since;        /* when K1 and K2 were both down, or 0 */
 
 static esp_err_t xl_write(uint8_t reg, uint8_t val)
 {
@@ -289,29 +303,63 @@ static esp_err_t audio_init(esp_codec_dev_handle_t *spk, esp_codec_dev_handle_t 
     return *spk && *mic ? ESP_OK : ESP_FAIL;
 }
 
-/* K1, active low on the expander, debounced like muse_gpio_button_poll(). */
-static unsigned poll_k1(void)
+/* Returns true on a debounced edge; the key is active low. */
+static bool xl_key_poll(xl_key_t *k, uint8_t in)
 {
-    uint8_t in;
-    if (xl_read(XL9555_IN0, &in) != ESP_OK) {
-        return 0;
+    bool down = (in & k->mask) == 0;
+    if (down == k->pressed) {
+        k->stable = 0;
+        return false;
     }
-    bool down = (in & XL_K1) == 0;
-    if (down == s_k1_pressed) {
-        s_k1_stable = 0;
-        return 0;
+    if (++k->stable < 3) {
+        return false;
     }
-    if (++s_k1_stable < 3) {
-        return 0;
-    }
-    s_k1_stable = 0;
-    s_k1_pressed = down;
-    return down ? MUSE_BTN_AUX_PRESS : MUSE_BTN_AUX_RELEASE;
+    k->stable = 0;
+    k->pressed = down;
+    return true;
 }
+
+#if CONFIG_MUSE_ATK_BOX_DUAL_BOOT
+/* Boots Vibe Buddy: the other app slot. Returns only if it can't. */
+static void switch_to_vibe_buddy(void)
+{
+    const esp_partition_t *other = esp_ota_get_next_update_partition(NULL);
+    esp_err_t err = other ? esp_ota_set_boot_partition(other) : ESP_ERR_NOT_FOUND;
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "can't boot the other slot: %s", esp_err_to_name(err));
+        muse_state_set_caption("NO VIBE BUDDY ON THIS BOX");
+        return;
+    }
+    ESP_LOGI(TAG, "switching to %s", other->label);
+    muse_state_set_caption("SWITCHING TO VIBE BUDDY");
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
+}
+#endif
 
 static unsigned poll_buttons(void)
 {
-    return muse_gpio_button_poll(&s_talk) | poll_k1();
+    unsigned ev = muse_gpio_button_poll(&s_talk);
+    uint8_t in;
+    if (xl_read(XL9555_IN0, &in) != ESP_OK) {
+        return ev;
+    }
+    if (xl_key_poll(&s_k1, in)) {
+        ev |= s_k1.pressed ? MUSE_BTN_AUX_PRESS : MUSE_BTN_AUX_RELEASE;
+    }
+    xl_key_poll(&s_k2, in);
+#if CONFIG_MUSE_ATK_BOX_DUAL_BOOT
+    int64_t now = esp_timer_get_time();
+    if (!s_k1.pressed || !s_k2.pressed) {
+        s_both_since = 0;
+    } else if (!s_both_since) {
+        s_both_since = now;
+    } else if (now - s_both_since >= SWITCH_HOLD_US) {
+        s_both_since = 0;
+        switch_to_vibe_buddy();
+    }
+#endif
+    return ev;
 }
 
 static esp_err_t power_off(void)
