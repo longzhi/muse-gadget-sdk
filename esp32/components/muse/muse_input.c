@@ -686,7 +686,9 @@ esp_err_t muse_input_start(QueueHandle_t queue)
         return ESP_FAIL;
     }
     /* Bench-test and setup console; the input still works if it can't start. */
+#if CONFIG_MUSE_SERIAL_INPUT
     xTaskCreate(serial_task, "muse_serial", 3584, NULL, 5, NULL);
+#endif
     return ESP_OK;
 }
 

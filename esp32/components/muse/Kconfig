@@ -118,6 +118,17 @@ menu "Muse"
         bool
         default y if MUSE_BOARD_SENSECAP_WATCHER || !SOC_USB_SERIAL_JTAG_SUPPORTED
 
+    config MUSE_SERIAL_INPUT
+        bool "Read bench keys and console commands from the serial port"
+        depends on MUSE_ENABLED
+        default y
+        help
+            Single characters act as keys ('a' menu Down, 'd' talk, 'z'
+            sleep...) and '>' lines are setup commands; see muse_input.c.
+            Turn it off where something else writes to the port, such as
+            Vibe Buddy's daemon on a box the two share: its JSON would
+            press keys.
+
     # A board overlay can raise this for a quiet speaker.
     config MUSE_DEFAULT_VOLUME
         int "Speaker volume until one is chosen in settings (percent)"

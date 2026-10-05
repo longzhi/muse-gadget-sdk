@@ -17,6 +17,9 @@
 CONFIG_MUSE_ATK_BOX_DUAL_BOOT=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_atk_box_dual.csv"
 CONFIG_PARTITION_TABLE_OFFSET=0x8000
+# Vibe Buddy's daemon keeps writing JSON to the USB port while Muse runs, and
+# the console would read its letters as key presses.
+# CONFIG_MUSE_SERIAL_INPUT is not set
 # Each app switches to the other through otadata, and neither confirms itself
 # after the switch: with rollback on, the bootloader would send it back.
 # CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
