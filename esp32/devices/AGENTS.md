@@ -40,6 +40,7 @@ code for it. Clone the repo rather than reading it on the web, and search it.
 | Home Assistant Voice Preview Edition | [esphome/home-assistant-voice-pe](https://github.com/esphome/home-assistant-voice-pe) | `home-assistant-voice.yaml`, its ESPHome config. |
 | Freenove FNK0104B | [Freenove/Freenove_ESP32_S3_Display](https://github.com/Freenove/Freenove_ESP32_S3_Display) | `Tutorial_With_Touch/Sketches/`: `Sketch_07.1_Music` (ES8311 + I2S pins), `Sketch_11.1_Touch` (FT6336U), `Sketch_05.1_Battery_Voltage` (battery divider), `Sketch_02.1_LedPixel` (WS2812 pin). `Libraries/FNK0104AB/` has the TFT_eSPI setup with the display pins. |
 | Waveshare ESP32-S3-Touch-LCD-7 | [waveshareteam/ESP32-S3-Touch-LCD-7](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-7), [waveshareteam/waveshare_boards](https://github.com/waveshareteam/waveshare_boards) | `examples/ESP-IDF/09_lvgl_v9_demo/components/waveshare_rgb_lcd_port.[ch]` for RGB timing, GT911 reset and CH422G output; `boards/esp32_s3_touch_lcd_7/` for the pin map. |
+| xiaozhi compact clone, 1.28" round GC9A01 | No vendor source. xiaozhi-esp32's [bread-compact-wifi](https://github.com/78/xiaozhi-esp32/tree/main/main/boards/bread-compact-wifi) and [bread-compact-wifi-lcd](https://github.com/78/xiaozhi-esp32/tree/main/main/boards/bread-compact-wifi-lcd) boards | The stock firmware is a modified `bread-compact-wifi` with a GC9A01 SPI LCD; its pins were read from the firmware's machine code (see the board file). Upstream's `config.h` has the same I2S, BOOT and LED pins but different LCD pins. |
 | Seeed reSpeaker Lite | [respeaker/reSpeaker_Lite](https://github.com/respeaker/reSpeaker_Lite) | `doc/images/pinout.png`, the I2C examples, `xmos_firmwares/`. |
 
 For the Cardputer ADV keyboard, also read [m5stack/M5Cardputer](https://github.com/m5stack/M5Cardputer), especially `src/utility/Keyboard/KeyboardReader/TCA8418.cpp` and `src/utility/Adafruit_TCA8418/`.
@@ -193,7 +194,11 @@ follows the same two steps. Copy `DEVKIT_GPIO27` (addressable) or `PWM_RGB`.
    `sdkconfig.muse`. It holds the target, `CONFIG_MUSE_BOARD_<NAME>=y`, PSRAM,
    the flash size if it isn't 16 MB (with 8 MB, also
    `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_muse_8mb.csv"`), and any
-   LVGL fonts or options the board needs. Leave bench options, like
+   LVGL fonts or options the board needs. A board sold to Chinese or Japanese
+   speakers needs `CONFIG_MUSE_CJK_FONT=y` (plus `CONFIG_MUSE_CJK_FONT_NOTO=y`
+   for the anti-aliased font): the switch is per board, off by default, and
+   without it CJK captions show as boxes. It takes about 900 KB of flash, so
+   check the `check_sizes` line on 8 MB boards. Leave bench options, like
    screenshots, to `sdkconfig.muse-bench` (`MUSE_BENCH=1`).
 6. **Helper.** Add a case to `tools/muse/board.sh` with a short alias, the
    profile (the overlay suffix), the target, and `baud` if its USB bridge

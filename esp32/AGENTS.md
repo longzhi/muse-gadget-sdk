@@ -68,6 +68,7 @@ before adding a feature to one.
 | M5Stack CoreS3 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-cores3` | `tools/muse/board.sh build cores3` |
 | Freenove FNK0104B | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-fnk0104b` | `tools/muse/board.sh build fnk0104b` |
 | Guition JC3248W535 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-guition-jc3248w535` | `tools/muse/board.sh build jc3248w535` |
+| xiaozhi compact clone, 1.28" round GC9A01 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-xiaozhi-gc9a01` | `tools/muse/board.sh build xiaozhi-gc9a01` |
 | Waveshare ESP32-S3-Touch-LCD-7 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-lcd7` | `tools/muse/board.sh build lcd7` |
 | M5Stack StickC Plus2 | `esp32` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-stickc-plus2` | manual |
 | M5Stack Core2 (v1.0) | `esp32` | `devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-core2` | `tools/muse/board.sh build core2` |

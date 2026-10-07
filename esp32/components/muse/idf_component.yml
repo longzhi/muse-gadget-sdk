@@ -29,7 +29,7 @@ dependencies:
   espressif/esp_lvgl_adapter:
     version: "0.6.4"
     rules:
-      - if: "$CONFIG{MUSE_BOARD_ID} in [\"waveshare_s3_175c\", \"waveshare_s3_175\", \"aipi\", \"atk_dnesp32s3_box\", \"m5stack_cardputer_adv\", \"sensecap_watcher\", \"m5stack_sticks3\", \"m5stack_stickc_plus2\", \"m5stack_stopwatch\", \"fnk0104b\"]"
+      - if: "$CONFIG{MUSE_BOARD_ID} in [\"waveshare_s3_175c\", \"waveshare_s3_175\", \"aipi\", \"atk_dnesp32s3_box\", \"m5stack_cardputer_adv\", \"sensecap_watcher\", \"m5stack_sticks3\", \"m5stack_stickc_plus2\", \"m5stack_stopwatch\", \"fnk0104b\", \"xiaozhi_gc9a01\"]"
   espressif/esp_lcd_ili9341:
     version: "^2.1.0"
     rules:
@@ -78,3 +78,7 @@ dependencies:
     version: "1.2.1"
     rules:
       - if: "$CONFIG{MUSE_BOARD_ID} == \"waveshare_s3_lcd7\""
+  espressif/esp_lcd_gc9a01:
+    version: "^2.0.1"
+    rules:
+      - if: "$CONFIG{MUSE_BOARD_ID} == \"xiaozhi_gc9a01\""
