@@ -33,6 +33,8 @@
 #define MUSE_HOST_MAX 63
 #define MUSE_VM_MAX 63
 #define MUSE_TOKEN_MAX 1023
+#define MUSE_TTS_KEY_MAX 127      /* ElevenLabs API key */
+#define MUSE_TTS_VOICE_MAX 63     /* ElevenLabs voice ID; empty: CONFIG_MUSE_TTS_VOICE */
 
 #define MUSE_MIC_GAIN_MAX 36      /* dB; ES7210 PGA, applied in 3 dB steps */
 
@@ -45,6 +47,7 @@ typedef enum {
     MUSE_SETTING_WIFI,          /* on/off or credentials */
     MUSE_SETTING_BLE,
     MUSE_SETTING_HATCH,
+    MUSE_SETTING_TTS,           /* spoken replies' key or voice */
 } muse_setting_t;
 
 typedef void (*muse_setting_cb_t)(muse_setting_t what);
@@ -65,6 +68,9 @@ void muse_settings_hatch_host(char out[MUSE_HOST_MAX + 1]);
 void muse_settings_hatch_vm(char out[MUSE_VM_MAX + 1]);
 void muse_settings_hatch_token(char out[MUSE_TOKEN_MAX + 1]);
 size_t muse_settings_hatch_token_len(void);
+void muse_settings_tts_key(char out[MUSE_TTS_KEY_MAX + 1]);
+size_t muse_settings_tts_key_len(void);   /* 0: replies are shown, not spoken */
+void muse_settings_tts_voice(char out[MUSE_TTS_VOICE_MAX + 1]);
 
 void muse_settings_set_volume(int pct);
 void muse_settings_set_speaker_on(bool on);
@@ -78,5 +84,7 @@ void muse_settings_set_ble_on(bool on);
 void muse_settings_set_wifi(const char *ssid, const char *pass);
 void muse_settings_set_hatch_host(const char *host);
 void muse_settings_set_hatch_vm(const char *vm);
+void muse_settings_set_tts_key(const char *key);       /* "" turns speech off */
+void muse_settings_set_tts_voice(const char *voice);   /* "" for the default */
 /* append=true adds to the stored token (for chunked BLE writes). */
 esp_err_t muse_settings_set_hatch_token(const char *token, bool append);

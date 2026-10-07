@@ -94,12 +94,13 @@ static int build_status(char *out, size_t len)
                     "{\"name\":\"%s\",\"fw\":\"%s\",\"battery\":%d,"
                     "\"wifi\":{\"on\":%s,\"state\":\"%s\",\"ssid\":\"%s\",\"ip\":\"%s\",\"rssi\":%d},"
                     "\"hatch\":{\"host\":\"%s\",\"vm\":\"%s\",\"token\":%s,\"state\":\"%s\"},"
-                    "\"link\":{\"paired\":%s,\"state\":\"%s\"},"
+                    "\"link\":{\"paired\":%s,\"state\":\"%s\"},\"tts\":%s,"
                     "\"volume\":%d,\"speaker\":%s,\"mic_gain\":%d,\"brightness\":%d,\"sleep\":%d,\"last\":\"%s\"}",
                     s_name, esp_app_get_description()->version, p.battery_pct,
                     muse_settings_wifi_on() ? "true" : "false", wifi_state_name(w.state), ssid_e, w.ip, w.rssi,
                     host_e, vm_e, muse_settings_hatch_token_len() ? "true" : "false", muse_hatch_state_name(h.state),
                     muse_link_hatch_linked() ? "true" : "false", muse_link_state_name(muse_link_state()),
+                    muse_settings_tts_key_len() ? "true" : "false",
                     muse_settings_volume(), muse_settings_speaker_on() ? "true" : "false",
                     muse_settings_mic_gain(), muse_settings_brightness(),
                     muse_settings_sleep_s(), last_e);
@@ -157,6 +158,18 @@ static void run_command(char *cmd)
         if (muse_settings_set_hatch_token(v, cmd[11] == '+') != ESP_OK) {
             res = "error: token too long";
         }
+    } else if (!strcmp(cmd, "tts.key")) {
+        if (strlen(v) > MUSE_TTS_KEY_MAX) {
+            res = "error: key too long";
+        } else {
+            muse_settings_set_tts_key(v);
+        }
+    } else if (!strcmp(cmd, "tts.voice")) {
+        if (strlen(v) > MUSE_TTS_VOICE_MAX) {
+            res = "error: voice ID too long";
+        } else {
+            muse_settings_set_tts_voice(v);
+        }
     } else if (!strcmp(cmd, "hatch.test")) {
         muse_hatch_test();
     } else if (!strcmp(cmd, "test.loopback")) {
@@ -176,7 +189,7 @@ static void run_command(char *cmd)
     }
 
     /* Never echo secrets back. */
-    bool secret = !strcmp(cmd, "wifi.pass") || !strncmp(cmd, "hatch.token", 11);
+    bool secret = !strcmp(cmd, "wifi.pass") || !strncmp(cmd, "hatch.token", 11) || !strcmp(cmd, "tts.key");
     snprintf(s_last, sizeof(s_last), "%s: %s", cmd, res);
     ESP_LOGI(TAG, "cmd %s%s%s -> %s", cmd, secret ? "" : "=", secret ? "" : v, res);
     muse_state_poke();
