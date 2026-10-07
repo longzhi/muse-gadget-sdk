@@ -89,6 +89,7 @@ static bool s_small;
 static bool s_tall;         /* compact, with room above and below Muse (StickS3) */
 static int s_canvas_px;     /* Muse's size on screen */
 static int s_dy;            /* full layout: offset from a 466 px tall screen */
+static int s_round_in;      /* compact layout on a round panel: rows the top and bottom content moves in */
 static lv_indev_t *s_indev;
 static lv_obj_t *s_tv;
 static lv_obj_t *s_face;
@@ -643,6 +644,18 @@ static void set_answer(int which)
     move_muse(l ? l->px : s_canvas_px, l ? l->y : s_big_y);
 }
 
+/* Width across the screen `edge` px in from its top or bottom: the chord of a
+ * round panel, the whole width of a flat one. */
+static int chord_w(int edge)
+{
+    if (!muse_board->round) {
+        return s_w;
+    }
+    int r = (s_w < s_h ? s_w : s_h) / 2;
+    int y = r - edge;
+    return y >= r ? 0 : 2 * (int)sqrtf((float)(r * r - y * y));
+}
+
 /* Whether a reply `w` px wide fits across the screen `y` px from the centre. */
 static bool fits_across(int w, int y, int ring_in)
 {
@@ -895,7 +908,7 @@ static void build_screen(void)
     lv_obj_set_flex_flow(status, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(status, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(status, s_small ? 4 : 8, 0);
-    lv_obj_align(status, LV_ALIGN_TOP_MID, 0, s_small ? 1 : 20 + s_dy);
+    lv_obj_align(status, LV_ALIGN_TOP_MID, 0, s_small ? 1 + s_round_in : 20 + s_dy);
     s_wifi_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_ble_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_power_lbl = make_label(status, &lv_font_unscii_8, COLOR_DIM);
@@ -904,7 +917,7 @@ static void build_screen(void)
      * unless the screen is tall enough to fit it in small type above Muse. */
     s_state_lbl = make_label(face, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, 0xffffff);
     lv_obj_set_style_text_letter_space(s_state_lbl, s_small ? 1 : 2, 0);
-    lv_obj_align(s_state_lbl, LV_ALIGN_TOP_MID, 0, s_small ? 22 : 40 + s_dy);
+    lv_obj_align(s_state_lbl, LV_ALIGN_TOP_MID, 0, s_small ? 22 + s_round_in : 40 + s_dy);
     lv_obj_set_flag(s_state_lbl, LV_OBJ_FLAG_HIDDEN, s_small && !s_tall && s_h < 200);
 
     /* This gadget's own name, dim under the state while it's unpaired: with
@@ -912,7 +925,7 @@ static void build_screen(void)
      * Muse app. update_chrome() fills it in, shortens it to the hex tail on a
      * screen too narrow for the whole thing, and empties it once paired. */
     s_name_lbl = make_label(face, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, COLOR_DIM);
-    lv_obj_align(s_name_lbl, LV_ALIGN_TOP_MID, 0, s_small ? 32 : 60 + s_dy);
+    lv_obj_align(s_name_lbl, LV_ALIGN_TOP_MID, 0, s_small ? 32 + s_round_in : 60 + s_dy);
     /* Same rule as the state label: a square 128 px screen centres Muse over
      * these rows, so there's nowhere to put this without covering the face. */
     lv_obj_set_flag(s_name_lbl, LV_OBJ_FLAG_HIDDEN, s_small && !s_tall && s_h < 200);
@@ -920,22 +933,26 @@ static void build_screen(void)
     s_caption_lbl = make_label(face, font_pick(caption_font(), &lv_font_unscii_8), COLOR_CAPTION);
     if (s_small) {
         /* Two lines over the bottom of the face, on a dark band so they stay
-         * legible. A tall screen has room to keep them above the mic icon. */
-        lv_obj_set_size(s_caption_lbl, s_w, 2 * 8 + 2 + 4);
+         * legible. A tall screen has room to keep them above the mic icon. A
+         * round panel's bottom rows are short chords: the band sits higher,
+         * above the mic icon, and only as wide as the chord under it. */
+        int cap_off = (s_tall || s_tv) ? 30 : s_round_in ? 32 : 3;
+        int band_w = chord_w(cap_off) - (s_round_in ? 8 : 0);
+        lv_obj_set_size(s_caption_lbl, band_w, 2 * 8 + 2 + 4);
         lv_obj_set_style_pad_ver(s_caption_lbl, 2, 0);
         lv_obj_set_style_text_line_space(s_caption_lbl, 2, 0);
         lv_obj_set_style_bg_color(s_caption_lbl, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(s_caption_lbl, LV_OPA_70, 0);
         lv_label_set_long_mode(s_caption_lbl, LV_LABEL_LONG_MODE_DOTS);
         /* Touch screens need the caption above the navigation dots too. */
-        lv_obj_align(s_caption_lbl, LV_ALIGN_BOTTOM_MID, 0, (s_tall || s_tv) ? -30 : -3);
+        lv_obj_align(s_caption_lbl, LV_ALIGN_BOTTOM_MID, 0, -cap_off);
 #if CONFIG_MUSE_CJK_FONT
         /* CJK doesn't fit unscii-8's cell, so a reply with CJK in it fills the
          * band in the 16 px caption font instead: one line at a time, or two
          * on a landscape screen with the height for them, such as the
          * BOX-3's 320x240 (set_caption_font). */
         s_cjk_lines = !s_tall && s_h >= 200 ? 2 : 1;
-        muse_state_set_cjk_page((s_w - 2 * CJK_BAND_PAD) / lv_font_get_glyph_width(caption_font(), 'M', ' '),
+        muse_state_set_cjk_page((band_w - 2 * CJK_BAND_PAD) / lv_font_get_glyph_width(caption_font(), 'M', ' '),
                                 s_cjk_lines);
 #endif
 
@@ -1090,7 +1107,7 @@ static void build_overlays(void)
      * column in one typeface, the code large. The small card grows with the hint. */
     s_pair = lv_obj_create(lv_layer_top());
     lv_obj_remove_style_all(s_pair);
-    lv_obj_set_size(s_pair, s_small ? s_w - 8 : 300, s_small ? LV_SIZE_CONTENT : 150);
+    lv_obj_set_size(s_pair, s_small ? (s_round_in ? s_w * 3 / 4 : s_w - 8) : 300, s_small ? LV_SIZE_CONTENT : 150);
     lv_obj_center(s_pair);
     lv_obj_set_flex_flow(s_pair, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(s_pair, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -1253,7 +1270,7 @@ static void update_chrome(float now)
     const lv_font_t *name_font = s_small ? &lv_font_unscii_8 : &lv_font_unscii_16;
     int name_cw = lv_font_get_glyph_width(name_font, 'M', ' ');
     const char *shown = paired ? "" : b.name;
-    if (name_cw > 0 && (int)strlen(shown) * name_cw > s_w) {
+    if (name_cw > 0 && (int)strlen(shown) * name_cw > chord_w(32 + s_round_in + 8)) {
         const char *tail = strrchr(shown, '-');
         if (tail && tail[1]) {
             shown = tail + 1;
@@ -1562,6 +1579,9 @@ esp_err_t muse_ui_start(void)
     bool short_landscape = s_w > s_h && s_h < 320;
     s_small = s_h < 200 || s_w < 200 || short_landscape || s_w < 300;
     s_tall = s_small && s_h >= s_w + 64;
+    /* A round compact screen (the 240 px GC9A01) curves away from the status
+     * rows and the caption band: they move in to where the chord has room. */
+    s_round_in = s_small && muse_board->round ? 12 : 0;
     /* Small screens keep room for the status line and button icons. A narrow
      * one is as wide as Muse gets, in whole pixels. */
     s_canvas_px = s_small ? s_h * 3 / 4 : MUSE_PX_W * 5;
