@@ -88,6 +88,9 @@ menu "Muse"
         config MUSE_BOARD_WAVESHARE_S3_LCD7
             bool "Waveshare ESP32-S3-Touch-LCD-7 (800x480 touch LCD, no audio)"
             depends on IDF_TARGET_ESP32S3
+        config MUSE_BOARD_XIAOZHI_GC9A01
+            bool "xiaozhi compact clone (ESP32-S3, 1.28\" 240x240 round GC9A01 LCD, I2S mic and amp)"
+            depends on IDF_TARGET_ESP32S3
     endchoice
 
     config MUSE_ENABLED
@@ -114,6 +117,7 @@ menu "Muse"
         default "fnk0104b" if MUSE_BOARD_FNK0104B
         default "guition_jc3248w535" if MUSE_BOARD_GUITION_JC3248W535
         default "waveshare_s3_lcd7" if MUSE_BOARD_WAVESHARE_S3_LCD7
+        default "xiaozhi_gc9a01" if MUSE_BOARD_XIAOZHI_GC9A01
         default "none"
 
     # The Muse tools' serial port: the console UART behind the board's USB
