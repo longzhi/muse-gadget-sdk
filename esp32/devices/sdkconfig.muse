@@ -96,3 +96,6 @@ CONFIG_LWIP_DHCP_DOES_NOT_CHECK_OFFERED_IP=y
 # by GlobalSign Root CA, which the bundle no longer has. Check the chain's
 # intermediates against the bundle too (about 700 bytes of heap).
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y
+# Spoken replies open a connection per batch of sentences: resume the TLS
+# session from its ticket rather than a full handshake each time.
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y
