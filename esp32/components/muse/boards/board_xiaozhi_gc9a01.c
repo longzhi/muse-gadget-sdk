@@ -184,11 +184,6 @@ static void set_brightness(int pct)
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
-static void panel_sleep(bool sleep)
-{
-    esp_lcd_panel_disp_sleep(s_panel, sleep);   /* SLPIN/SLPOUT; GRAM is kept */
-}
-
 /* No codec: the amp takes I2S as is, esp_codec_dev adds the volume in
  * software, and the mic gain is applied here. Both ports run all the time;
  * idle, the speaker sends zeros (auto_clear). */
@@ -313,7 +308,8 @@ static const muse_board_t s_board = {
     .display_lock = display_lock,
     .display_unlock = esp_lv_adapter_unlock,
     .set_brightness = set_brightness,
-    .panel_sleep = panel_sleep,
+    /* No panel_sleep: esp_lcd_gc9a01 doesn't implement disp_sleep, so the
+     * screen goes dark by its backlight alone. */
     .audio_init = audio_init,
     .mic_slot = 0,              /* L/R to GND: the left slot */
     .set_mic_gain = set_mic_gain,
