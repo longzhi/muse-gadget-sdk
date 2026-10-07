@@ -232,11 +232,15 @@ things you can change:
 
 - **Shorter answers.** Ask for them in the message itself, such as "Answer in
   one sentence."
-- **Spoken answers.** Send each reply's text to a text-to-speech API of your
-  choice and play the audio it returns. On boards with PSRAM, `start_tts` in
-  [`components/muse/muse_chat_session.cpp`](components/muse/muse_chat_session.cpp)
-  is the spot: it has the reply text, and the MP3 decoder, speaker and volume
-  are already wired up there.
+- **Spoken answers.** On boards with PSRAM, replies are spoken through
+  [ElevenLabs](https://elevenlabs.io) once you give the device an API key:
+  `>tts.key=sk_...` on the serial console, or the Speech fields in
+  [`tools/muse/ble_setup.html`](tools/muse/ble_setup.html). `>tts.voice=...`
+  picks a voice (default: `CONFIG_MUSE_TTS_VOICE`), and `>tts.key=` turns
+  speech off again. The key stays in NVS, never in the firmware, but it's a
+  real password: see the NVS encryption note below. To use another service,
+  swap out [`components/muse/muse_tts.c`](components/muse/muse_tts.c); it
+  only has to stream back an MP3.
 
 A few things worth knowing:
 

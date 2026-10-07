@@ -94,6 +94,16 @@
     </section>
 
     <section>
+      <h2>Speech <span class="dim">(ElevenLabs)</span></h2>
+      <label for="tts-key">API key <span class="dim">(leave empty to keep the current one)</span></label>
+      <input id="tts-key" type="password" autocomplete="off" maxlength="127">
+      <label for="tts-voice">Voice ID <span class="dim">(leave empty for the default)</span></label>
+      <input id="tts-voice" type="text" autocomplete="off" maxlength="63">
+      <button id="tts-save">Save</button>
+      <button id="tts-off" class="secondary">Turn speech off</button>
+    </section>
+
+    <section>
       <h2>Sound &amp; sleep</h2>
       <label>Volume <span id="volume-v"></span></label>
       <input id="volume" type="range" min="0" max="100">
@@ -146,7 +156,7 @@ async function refresh() {
   $('conn').textContent = `${s.name} · fw ${s.fw}`;
   $('status').innerHTML =
     `Wi-Fi: <b>${w.on ? w.state : 'off'}</b>${w.ssid ? ` (${esc(w.ssid)}${w.ip ? `, ${w.ip}` : ''})` : ''}<br>` +
-    `Muse: <b>${esc(h.state)}</b> · token ${h.token ? 'set' : 'not set'}<br>` +
+    `Muse: <b>${esc(h.state)}</b> · token ${h.token ? 'set' : 'not set'} · speech ${s.tts ? 'on' : 'off'}<br>` +
     (s.battery >= 0 ? `Battery ${s.battery}%` : 'Battery: n/a');
   if (document.activeElement !== $('ssid') && !$('ssid').value) $('ssid').value = w.ssid;
   if (document.activeElement !== $('host')) $('host').value = h.host;
@@ -221,6 +231,14 @@ $('hatch-save').onclick = async () => {
   $('token').value = '';
 };
 $('hatch-test').onclick = () => send('hatch.test');
+$('tts-save').onclick = async () => {
+  const key = $('tts-key').value.trim();
+  if (key) send('tts.key', key);
+  send('tts.voice', $('tts-voice').value.trim());
+  await queue;
+  $('tts-key').value = '';
+};
+$('tts-off').onclick = () => send('tts.key');
 
 for (const [id, cmd, fmt] of [['volume', 'volume', v => `${v}%`], ['mic', 'mic_gain', v => `${v} dB`],
                               ['bright', 'brightness', v => `${v}%`]]) {

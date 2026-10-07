@@ -54,7 +54,7 @@ static void on_setting(muse_setting_t what)
         muse_hatch_config_changed();
         break;
     default:
-        break;   /* brightness, sleep and the speaker are polled where they're used */
+        break;   /* brightness, sleep, the speaker and speech are read where they're used */
     }
 }
 

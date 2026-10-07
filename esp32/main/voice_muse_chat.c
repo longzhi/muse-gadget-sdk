@@ -86,6 +86,19 @@ size_t muse_settings_hatch_token_len(void) {
     return 0;
 }
 
+// No speech key: replies stay text.
+void muse_settings_tts_key(char out[MUSE_TTS_KEY_MAX + 1]) {
+    out[0] = '\0';
+}
+
+size_t muse_settings_tts_key_len(void) {
+    return 0;
+}
+
+void muse_settings_tts_voice(char out[MUSE_TTS_VOICE_MAX + 1]) {
+    out[0] = '\0';
+}
+
 // No screen to show replies on: anything played goes to the speaker.
 bool muse_settings_speaker_on(void) {
     return true;

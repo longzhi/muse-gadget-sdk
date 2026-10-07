@@ -69,6 +69,8 @@ extern "C" {
 #include "muse_account_api.h"
 #include "muse_link.h"
 #include "muse_settings.h"
+#include "muse_text.h"
+#include "muse_tts.h"
 #include "muse_wifi.h"
 }
 #include "muse_chat_priv.h"
@@ -102,6 +104,8 @@ static const char *TAG = "muse_chat_session";
 #define SPEECH_CHARS_PER_S 14              /* until the speech's length is known */
 #define TEXT_CHARS_PER_S 16                /* speaker off: reading pace, a little over speech */
 #define TEXT_HOLD_S 2                      /* speaker off: how long a message's last lines stay up */
+#define TTS_BUSY_WAIT_US (5 * 1000000LL)   /* the last speech request winding down: then read it instead */
+#define TTS_SENTENCE_MIN 24                /* bytes: a sentence shorter than this goes with the next */
 
 #define PING_US (20 * 1000000LL)
 #define DEAD_US (60 * 1000000LL)           /* nothing from the server, pongs included */
@@ -244,6 +248,11 @@ struct turn_t {
     resampler_t down;
     int kbps;
     int down_rate;
+    int64_t tts_wait_us;     /* when start_tts first found the speech request busy, or 0 */
+    size_t tts_said;         /* bytes of tts_msg's text handed to muse_tts */
+    bool tts_fed;            /* ...and all of it, with muse_tts_finish */
+    bool tts_no_early;       /* speech couldn't start before a message was done: wait until it is */
+    bool seg_gap;            /* the MP3 buffer ends with a whole request's speech, more to follow */
 };
 
 /* 10 KB, most of it the MP3 decoder: in PSRAM on boards that let static data go
@@ -953,12 +962,14 @@ static void turn_reset_streams(void)
 
 static void turn_finish(void)
 {
+    muse_tts_cancel();
     turn_reset_streams();
     s_turn.phase = P_IDLE;
     s_turn.dict_id = s_turn.chat_id = 0;
     s_turn.tts_msg = -1;
     s_turn.silent = false;
     s_turn.mp3_len = 0;
+    s_turn.mp3_ended = false;
 }
 
 static void turn_fail(const char *why)
@@ -1501,31 +1512,82 @@ static void on_chat_ack(stream_t *s)
 
 /* ---- Turn: speech ---- */
 
+/* Opens message i's speech; its sentences follow from feed_tts(). */
+static esp_err_t begin_speech(int i)
+{
+    esp_err_t err = muse_tts_start();
+    if (err != ESP_OK) {
+        return err;
+    }
+    msg_t &m = s_turn.msgs[i];
+    m.pcm_start = s_turn.pcm_out;
+    m.pcm_frames = 0;
+    m.tts = TTS_ACTIVE;
+    s_turn.tts_msg = i;
+    s_turn.silent = false;
+    s_turn.mp3_len = 0;
+    s_turn.mp3_ended = false;
+    s_turn.seg_gap = false;
+    s_turn.kbps = 0;
+    s_turn.down_rate = 0;
+    s_turn.tts_wait_us = 0;
+    s_turn.tts_said = 0;
+    s_turn.tts_fed = false;
+    mp3dec_init(&s_turn.dec);
+    mark(M_TTS);
+    ESP_LOGI(TAG, "speaking message %s (%u chars so far%s)", m.id, (unsigned)m.len, m.done ? ", all" : "");
+    show_reply_start(m);
+    return ESP_OK;
+}
+
+/*
+ * Picks the next message to play, in the order they began. With a speech key
+ * set (muse_tts.c), a message is spoken as soon as its first sentence is in,
+ * while the rest is still arriving: feed_tts() passes on each sentence, and
+ * decode() plays the MP3s that stream back, captions following. Otherwise, or
+ * if that can't start, the message waits until it's done and is shown at
+ * reading pace: silence in place of speech paces the captions.
+ */
 static void start_tts(void)
 {
     if (s_turn.tts_msg >= 0) {
         return;
     }
+    bool speak = s_turn.texts && !s_turn.text && muse_settings_speaker_on() && muse_tts_configured();
     for (int i = 0; i < s_turn.nmsgs; i++) {
         msg_t &m = s_turn.msgs[i];
-        if (m.tts != TTS_QUEUED) {
-            continue;
+        if (m.tts == TTS_FINISHED || (m.done && m.tts == TTS_NONE)) {
+            continue;   /* played, or done with nothing to say */
         }
-        /*
-         * Replies are text, shown at reading pace: silence in place of speech
-         * paces the captions and ends the turn. To speak them instead, send
-         * the message's text (s_turn.texts + i * TEXT_MAX, if texts was
-         * allocated; up to TEXT_MAX - 1 bytes) to a TTS API of your choice and
-         * play the MP3 it returns. In place of the silence below: keep
-         * m.tts = TTS_ACTIVE and s_turn.tts_msg = i, set s_turn.silent = false,
-         * m.pcm_start = s_turn.pcm_out, m.pcm_frames = 0, s_turn.mp3_len = 0,
-         * s_turn.mp3_ended = false, s_turn.kbps = 0, s_turn.down_rate = 0 and
-         * mp3dec_init(&s_turn.dec). Then, on this task, pass the MP3 to
-         * tts_data() as it arrives (it buffers up to MP3_BUF and drops the
-         * rest, so hold off while it's full) and set s_turn.mp3_ended at the
-         * end. decode() plays it at the speaker's volume, captions following,
-         * and finishes the message once it's drained.
-         */
+        if (m.tts == TTS_NONE) {
+            /* Still arriving: start once a sentence is in, keeping order. */
+            const char *text = speak && !s_turn.tts_no_early ? s_turn.texts + i * TEXT_MAX : nullptr;
+            if (text && muse_text_sentence_end(text, strlen(text), TTS_SENTENCE_MIN)) {
+                esp_err_t err = begin_speech(i);
+                if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+                    ESP_LOGW(TAG, "can't speak message %s yet (%s)", m.id, esp_err_to_name(err));
+                    s_turn.tts_no_early = true;
+                }
+            }
+            return;
+        }
+        /* TTS_QUEUED: all of it is in. */
+        if (speak) {
+            esp_err_t err = begin_speech(i);
+            if (err == ESP_OK) {
+                return;
+            }
+            if (err == ESP_ERR_INVALID_STATE) {   /* the last request is still winding down */
+                if (!s_turn.tts_wait_us) {
+                    s_turn.tts_wait_us = now_us();
+                }
+                if (now_us() - s_turn.tts_wait_us < TTS_BUSY_WAIT_US) {
+                    return;   /* try again next time round */
+                }
+            }
+            ESP_LOGW(TAG, "can't speak message %s (%s): showing it", m.id, esp_err_to_name(err));
+        }
+        s_turn.tts_wait_us = 0;
         m.pcm_start = s_turn.pcm_out;
         m.pcm_frames = (uint32_t)(m.len * MIC_RATE / TEXT_CHARS_PER_S);
         m.tts = TTS_ACTIVE;
@@ -1568,17 +1630,95 @@ static void pace_silently(void)
 {
     static const int16_t zeros[256] = {};
     msg_t &m = s_turn.msgs[s_turn.tts_msg];
+    if (!m.done) {   /* speech gave out on a message still arriving: keep pace with it */
+        m.pcm_frames = (uint32_t)(m.len * MIC_RATE / TEXT_CHARS_PER_S);
+    }
     uint32_t end = m.pcm_start + m.pcm_frames + TEXT_HOLD_S * MIC_RATE;
     while (s_turn.pcm_out < end && xStreamBufferSpacesAvailable(s_out) >= sizeof(zeros)) {
         uint32_t n = end - s_turn.pcm_out < 256 ? end - s_turn.pcm_out : 256;
         xStreamBufferSend(s_out, zeros, n * sizeof(int16_t), 0);
         s_turn.pcm_out += n;
     }
-    if (s_turn.pcm_out >= end) {
+    if (s_turn.pcm_out >= end && m.done) {
         m.tts = TTS_FINISHED;
         s_turn.tts_msg = -1;
         s_turn.silent = false;
     }
+}
+
+/* Hands muse_tts each sentence of the message being spoken as it completes,
+ * and the rest once the message is done. */
+static void feed_tts(void)
+{
+    if (s_turn.tts_fed) {
+        return;
+    }
+    msg_t &m = s_turn.msgs[s_turn.tts_msg];
+    const char *text = s_turn.texts + s_turn.tts_msg * TEXT_MAX;
+    size_t len = strlen(text);
+    size_t n;
+    while ((n = muse_text_sentence_end(text + s_turn.tts_said, len - s_turn.tts_said, TTS_SENTENCE_MIN))) {
+        if (muse_tts_say(text + s_turn.tts_said, n) != ESP_OK) {
+            return;   /* queue full: next time round */
+        }
+        s_turn.tts_said += n;
+    }
+    if (!m.done) {
+        return;
+    }
+    if (s_turn.tts_said < len) {
+        if (muse_tts_say(text + s_turn.tts_said, len - s_turn.tts_said) != ESP_OK) {
+            return;
+        }
+        s_turn.tts_said = len;
+    }
+    if (muse_tts_finish() == ESP_OK) {
+        s_turn.tts_fed = true;
+    }
+}
+
+/*
+ * Moves the speech that has arrived into the MP3 buffer, short of the level at
+ * which poll_socket() stops reading the session: the rest waits in muse_tts's
+ * buffer, and TCP holds ElevenLabs back. Once it has all come, decode() is told
+ * to finish; if nothing came at all, the message is read instead.
+ */
+static void pump_tts(void)
+{
+    if (s_turn.tts_msg < 0 || s_turn.silent || s_turn.mp3_ended) {
+        return;
+    }
+    feed_tts();
+    /* Asked before draining: if muse_tts was already waiting for text, what
+     * this drains is the end of a whole request. */
+    bool waiting = muse_tts_waiting();
+    const size_t cap = MP3_BUF - MP3_POLL_ROOM;
+    size_t n = 0;
+    if (s_turn.mp3_len < cap) {
+        n = muse_tts_pump(s_turn.mp3 + s_turn.mp3_len, cap - s_turn.mp3_len);
+        if (n) {
+            mark(M_MP3);
+            s_turn.mp3_len += n;
+        }
+    }
+    s_turn.seg_gap = waiting && !n;
+    if (n || s_turn.mp3_len >= cap) {
+        return;   /* drain what's waiting before judging the end */
+    }
+    size_t got;
+    muse_tts_state_t st = muse_tts_state(&got);
+    if (st == MUSE_TTS_RUNNING) {
+        return;
+    }
+    msg_t &m = s_turn.msgs[s_turn.tts_msg];
+    if (st == MUSE_TTS_DONE || got) {
+        s_turn.mp3_ended = true;   /* play what's here, even if it was cut short */
+        return;
+    }
+    ESP_LOGW(TAG, "no speech for message %s: showing it", m.id);
+    m.pcm_start = s_turn.pcm_out;
+    m.pcm_frames = (uint32_t)(m.len * MIC_RATE / TEXT_CHARS_PER_S);
+    s_turn.silent = true;
 }
 
 /* Decodes buffered MP3 while the reply buffer has room. */
@@ -1596,7 +1736,7 @@ static void decode(void)
      * less, it resets and says to skip all of it, which drops speech and clicks.
      * So until the stream ends, leave the last MP3_HOLD bytes for more to arrive.
      */
-    size_t hold = s_turn.mp3_ended ? 0 : MP3_HOLD;
+    size_t hold = s_turn.mp3_ended || s_turn.seg_gap ? 0 : MP3_HOLD;
     size_t off = 0;
     while (s_turn.mp3_len - off > hold &&
            xStreamBufferSpacesAvailable(s_out) >= (MINIMP3_MAX_SAMPLES_PER_FRAME / 2 + 8) * sizeof(int16_t)) {
@@ -1985,6 +2125,7 @@ static void hatch_task(void *arg)
         }
         if (s_turn.phase == P_WAIT_REPLY) {
             start_tts();
+            pump_tts();
             decode();
         }
         if (!s_connected) {

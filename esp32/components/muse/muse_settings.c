@@ -44,6 +44,8 @@ static struct {
     char host[MUSE_HOST_MAX + 1];
     char vm[MUSE_VM_MAX + 1];
     char token[MUSE_TOKEN_MAX + 1];
+    char tts_key[MUSE_TTS_KEY_MAX + 1];
+    char tts_voice[MUSE_TTS_VOICE_MAX + 1];
 } s = {
     .volume = CONFIG_MUSE_DEFAULT_VOLUME,
     .speaker_on = true,
@@ -132,13 +134,16 @@ esp_err_t muse_settings_init(void)
     load_str("host", s.host, sizeof(s.host));
     load_str("vm", s.vm, sizeof(s.vm));
     load_str("token", s.token, sizeof(s.token));
+    load_str("tts_key", s.tts_key, sizeof(s.tts_key));
+    load_str("tts_voice", s.tts_voice, sizeof(s.tts_voice));
 
     s.volume = clampi(s.volume, 0, 100);
     s.mic_gain = clampi(s.mic_gain, 0, MUSE_MIC_GAIN_MAX);
     s.brightness = clampi(s.brightness, 10, 100);
-    ESP_LOGI(TAG, "vol %d%s, mic %d dB, bright %d, sleep %ds, wifi %s (%s), ble %s, muse %s",
+    ESP_LOGI(TAG, "vol %d%s, mic %d dB, bright %d, sleep %ds, wifi %s (%s), ble %s, muse %s, speech %s",
              s.volume, s.speaker_on ? "" : " (speaker off)", s.mic_gain, s.brightness, s.sleep_s, s.wifi_on ? "on" : "off",
-             "network saved by Link", s.ble_on ? "on" : "off", s.token[0] ? "token set" : "no token");
+             "network saved by Link", s.ble_on ? "on" : "off", s.token[0] ? "token set" : "no token",
+             s.tts_key[0] ? "key set" : "off");
     return ESP_OK;
 }
 
@@ -189,6 +194,23 @@ size_t muse_settings_hatch_token_len(void)
     size_t n;
     LOCKED(n = strlen(s.token));
     return n;
+}
+
+void muse_settings_tts_key(char out[MUSE_TTS_KEY_MAX + 1])
+{
+    LOCKED(strlcpy(out, s.tts_key, MUSE_TTS_KEY_MAX + 1));
+}
+
+size_t muse_settings_tts_key_len(void)
+{
+    size_t n;
+    LOCKED(n = strlen(s.tts_key));
+    return n;
+}
+
+void muse_settings_tts_voice(char out[MUSE_TTS_VOICE_MAX + 1])
+{
+    LOCKED(strlcpy(out, s.tts_voice, MUSE_TTS_VOICE_MAX + 1));
 }
 
 void muse_settings_set_volume(int pct)
@@ -274,6 +296,24 @@ void muse_settings_set_hatch_vm(const char *vm)
         save_str("vm", s.vm);
     });
     notify(MUSE_SETTING_HATCH);
+}
+
+void muse_settings_set_tts_key(const char *key)
+{
+    LOCKED({
+        strlcpy(s.tts_key, key ? key : "", sizeof(s.tts_key));
+        save_str("tts_key", s.tts_key);
+    });
+    notify(MUSE_SETTING_TTS);
+}
+
+void muse_settings_set_tts_voice(const char *voice)
+{
+    LOCKED({
+        strlcpy(s.tts_voice, voice ? voice : "", sizeof(s.tts_voice));
+        save_str("tts_voice", s.tts_voice);
+    });
+    notify(MUSE_SETTING_TTS);
 }
 
 esp_err_t muse_settings_set_hatch_token(const char *token, bool append)

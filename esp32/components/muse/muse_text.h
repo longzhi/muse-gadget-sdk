@@ -56,6 +56,13 @@ void muse_text_to_ascii(char *s, size_t cap);
 /* text, or if it needs stand-ins and fits in cap bytes, a copy with them in buf. */
 const char *muse_text_showable(const char *text, char *buf, size_t cap);
 
+/* Where the first sentence of `s` (len bytes of text still arriving) that is
+ * at least `min` bytes long ends, as a byte count, or 0 if there's none yet.
+ * A sentence ends after a newline; after ". ! ? ;" (and any closing quotes or
+ * brackets) once a space follows, so "3.14" and a word still arriving aren't
+ * cut; and after the CJK "。！？；…", with any closing marks after them. */
+size_t muse_text_sentence_end(const char *s, size_t len, size_t min);
+
 #ifdef __cplusplus
 }
 #endif

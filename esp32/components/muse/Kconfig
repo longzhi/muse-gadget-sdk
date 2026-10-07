@@ -186,9 +186,28 @@ menu "Muse"
         help
             Push-to-talk turns go over a voice session of Muse's own, to the
             VM Home Link is paired with or one set up on the device with a
-            device token. Replies are text, shown as captions; start_tts in
-            muse_chat_session.cpp is where a TTS API of your own can speak
-            them. Needs PSRAM. Without it, voice notes go over Home Link's own
-            session to its paired VM and replies are shown as text.
+            device token. Replies are text, shown as captions, and spoken
+            through ElevenLabs once an API key is set on the device
+            (tts.key). Needs PSRAM. Without it, voice notes go over Home
+            Link's own session to its paired VM and replies are shown as text.
+
+    config MUSE_TTS_MODEL
+        string "ElevenLabs model for spoken replies"
+        depends on MUSE_HATCH || HOMEHUB_VOICE
+        default "eleven_flash_v2_5"
+        help
+            The model_id sent to ElevenLabs. eleven_flash_v2_5 is the fastest
+            and cheapest that speaks Chinese and 30 other languages. The API
+            key isn't a build option: set it on the device with
+            ">tts.key=..." over serial or tts.key over BLE, where it's kept
+            in NVS. An empty key leaves replies as text.
+
+    config MUSE_TTS_VOICE
+        string "ElevenLabs voice ID for spoken replies"
+        depends on MUSE_HATCH || HOMEHUB_VOICE
+        default "21m00Tcm4TlvDq8ikWAM"
+        help
+            The voice used until one is set on the device with tts.voice.
+            The default is ElevenLabs' premade "Rachel".
 
 endmenu

@@ -262,3 +262,62 @@ const char *muse_text_showable(const char *text, char *buf, size_t cap)
     muse_text_to_ascii(buf, cap);
     return buf;
 }
+
+/* A closing quote or bracket that stays with the sentence before it: its
+ * length in bytes, or 0. */
+static size_t closer(const unsigned char *p, size_t left)
+{
+    if (left >= 1 && (p[0] == '"' || p[0] == '\'' || p[0] == ')' || p[0] == ']')) {
+        return 1;
+    }
+    if (left >= 3 && ((p[0] == 0xE2 && p[1] == 0x80 && (p[2] == 0x9D || p[2] == 0x99)) ||   /* ” ’ */
+                      (p[0] == 0xE3 && p[1] == 0x80 && (p[2] == 0x8D || p[2] == 0x8F || p[2] == 0x91)) ||   /* 」』】 */
+                      (p[0] == 0xEF && p[1] == 0xBC && p[2] == 0x89))) {   /* ） */
+        return 3;
+    }
+    return 0;
+}
+
+/* A CJK sentence end: its length in bytes, or 0. */
+static size_t cjk_stop(const unsigned char *p, size_t left)
+{
+    if (left < 3) {
+        return 0;
+    }
+    if ((p[0] == 0xE3 && p[1] == 0x80 && p[2] == 0x82) ||                                    /* 。 */
+        (p[0] == 0xEF && p[1] == 0xBC && (p[2] == 0x81 || p[2] == 0x9F || p[2] == 0x9B)) ||   /* ！？； */
+        (p[0] == 0xE2 && p[1] == 0x80 && p[2] == 0xA6)) {                                    /* … */
+        return 3;
+    }
+    return 0;
+}
+
+size_t muse_text_sentence_end(const char *s, size_t len, size_t min)
+{
+    const unsigned char *p = (const unsigned char *)s;
+    for (size_t i = 0; i < len; i++) {
+        size_t end = 0, n;
+        if (p[i] == '\n') {
+            end = i + 1;
+        } else if ((n = cjk_stop(p + i, len - i))) {
+            size_t j = i + n;
+            while (j < len && ((n = cjk_stop(p + j, len - j)) || (n = closer(p + j, len - j)))) {
+                j += n;   /* "……" or "。」" */
+            }
+            end = j;
+            i = j - 1;
+        } else if (p[i] == '.' || p[i] == '!' || p[i] == '?' || p[i] == ';') {
+            size_t j = i + 1;
+            while (j < len && (n = closer(p + j, len - j))) {
+                j += n;
+            }
+            if (j < len && (p[j] == ' ' || p[j] == '\n' || p[j] == '\t')) {
+                end = j + 1;
+            }
+        }
+        if (end && end >= min) {
+            return end;
+        }
+    }
+    return 0;
+}

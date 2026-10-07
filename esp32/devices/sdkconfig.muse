@@ -91,3 +91,11 @@ CONFIG_MBEDTLS_HARDWARE_AES=n
 # each new lease back a second before binding it. The router has already
 # checked the address it offers.
 CONFIG_LWIP_DHCP_DOES_NOT_CHECK_OFFERED_IP=y
+
+# Spoken replies (muse_tts.c): api.elevenlabs.io sends GTS Root R1 cross-signed
+# by GlobalSign Root CA, which the bundle no longer has. Check the chain's
+# intermediates against the bundle too (about 700 bytes of heap).
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y
+# Spoken replies open a connection per batch of sentences: resume the TLS
+# session from its ticket rather than a full handshake each time.
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y
